@@ -55,7 +55,8 @@ func getParams(prefix string, suffix string, delimiter string) map[string]envCon
 				suffixShift := len(pair[0]) - suffixLen - 1
 				paramName = pair[0][prefixShift:suffixShift]
 				paramValue = pair[1]
-				paramList = strings.Split(pair[1], delimiter)
+				trimmer := strings.Join([]string{delimiter, " "}, "")
+				paramList = strings.Split(strings.Trim(pair[1], trimmer), delimiter)
 			} else {
 				paramName = pair[0][prefixShift:]
 				paramValue = pair[1]
