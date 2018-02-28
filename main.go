@@ -11,11 +11,6 @@ const envDelimiter string = "="
 const paramsListDelimiter string = ","
 const paramsListSuffix string = "LIST"
 
-type envContainer struct {
-	Value string
-	List  []string
-}
-
 func getArgs() (string, string, string) {
 	inFileName := flag.String("i", "", "Input file name")
 	outFileName := flag.String("o", "", "Output file name")
@@ -40,10 +35,10 @@ func getArgs() (string, string, string) {
 	return *inFileName, *outFileName, *prefix
 }
 
-func getParams(prefix string, suffix string, delimiter string) map[string]envContainer {
+func getParams(prefix string, suffix string, delimiter string) map[string]interface{} {
 	prefixShift := len(prefix) + 1
 	suffixLen := len(suffix)
-	tplParams := make(map[string]envContainer)
+	tplParams := make(map[string]interface{})
 
 	for _, e := range os.Environ() {
 		pair := strings.Split(e, envDelimiter)
@@ -54,15 +49,15 @@ func getParams(prefix string, suffix string, delimiter string) map[string]envCon
 			if strings.HasSuffix(pair[0], suffix) {
 				suffixShift := len(pair[0]) - suffixLen - 1
 				paramName = pair[0][prefixShift:suffixShift]
-				paramValue = pair[1]
 				trimmer := strings.Join([]string{delimiter, " "}, "")
 				paramList = strings.Split(strings.Trim(pair[1], trimmer), delimiter)
+				tplParams[paramName] = paramList
 			} else {
 				paramName = pair[0][prefixShift:]
 				paramValue = pair[1]
-				paramList = []string{pair[1]}
+				tplParams[paramName] = paramValue
 			}
-			tplParams[paramName] = envContainer{paramValue, paramList}
+
 		}
 	}
 
