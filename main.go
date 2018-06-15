@@ -5,31 +5,24 @@ import (
 	"os"
 	"strings"
 	"text/template"
+	"bufio"
+	"io"
 )
 
-const envDelimiter string = "="
-const paramsListDelimiter string = ","
-const paramsListSuffix string = "LIST"
+const defaultParamPrefix = "GEV"
+const envDelimiter = "="
+const paramsListDelimiter = ","
+const paramsListSuffix = "LIST"
+const templateSuffix = ".tpl"
 
 func getArgs() (string, string, string) {
 	inFileName := flag.String("i", "", "Input file name")
 	outFileName := flag.String("o", "", "Output file name")
-	prefix := flag.String("p", "", "Prefix for environment variables")
+	prefix := flag.String("p", defaultParamPrefix, "Prefix for environment variables")
 	flag.Parse()
 
-	if len(*inFileName) == 0 {
-		os.Stderr.WriteString("Input file name not present\n")
-		os.Exit(1)
-	}
-
-	if len(*outFileName) == 0 {
-		os.Stderr.WriteString("Output file name not present\n")
-		os.Exit(1)
-	}
-
-	if len(*prefix) == 0 {
-		os.Stderr.WriteString("Prefix not present\n")
-		os.Exit(1)
+	if *outFileName == "" && strings.HasSuffix(*inFileName, templateSuffix) {
+		*outFileName = strings.TrimSuffix(*inFileName, templateSuffix)
 	}
 
 	return *inFileName, *outFileName, *prefix
@@ -43,9 +36,11 @@ func getParams(prefix string, suffix string, delimiter string) map[string]interf
 	for _, e := range os.Environ() {
 		pair := strings.Split(e, envDelimiter)
 		if strings.HasPrefix(pair[0], prefix) {
-			var paramName string
-			var paramValue string
-			var paramList []string
+			var (
+				paramName string
+				paramValue string
+				paramList []string
+			)
 			if strings.HasSuffix(pair[0], suffix) {
 				suffixShift := len(pair[0]) - suffixLen - 1
 				paramName = pair[0][prefixShift:suffixShift]
@@ -65,20 +60,45 @@ func getParams(prefix string, suffix string, delimiter string) map[string]interf
 }
 
 func main() {
-	var inFileName string
-	var outFileName string
-	var prefix string
+	var (
+		inFileName string
+		outFileName string
+		prefix string
+		out *os.File
+		tmpl *template.Template
+		err error
+	)
 
 	inFileName, outFileName, prefix = getArgs()
 
-	tmpl, err := template.ParseFiles(inFileName)
-	if err != nil {
-		panic(err)
+	if inFileName != "" {
+		tmpl, err = template.ParseFiles(inFileName)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		var (
+			content []rune
+			b rune
+		)
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			b, _, err = reader.ReadRune()
+			if err != nil && err == io.EOF {
+				break
+			}
+			content = append(content, b)
+		}
+		tmpl, _ = template.New("piped").Parse(string(content))
 	}
 
-	out, err := os.Create(outFileName)
-	if err != nil {
-		panic(err)
+	if outFileName != "" {
+		out, err = os.Create(outFileName)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		out = os.Stdout
 	}
 
 	tplParams := getParams(prefix, paramsListSuffix, paramsListDelimiter)
